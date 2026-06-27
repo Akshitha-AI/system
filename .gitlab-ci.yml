@@ -1,0 +1,60 @@
+stages:
+  - lint
+  - security
+  - test
+  - build
+  - deploy
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+default:
+  tags:
+    - windows
+
+cache:
+  paths:
+    - .cache/pip
+
+lint:
+  stage: lint
+  before_script:
+    - pip install ruff mypy
+  script:
+    - ruff check src tests
+    - ruff format --check src tests
+    - mypy src --ignore-missing-imports || true
+
+security:
+  stage: security
+  before_script:
+    - pip install pip-audit bandit
+  script:
+    - pip-audit -r requirements.txt --skip-editable -s osv || true
+    - bandit -r src -x tests
+
+test:
+  stage: test
+  before_script:
+    - pip install -r requirements-test.txt
+  script:
+    - pytest --cov=src --cov-report=xml tests
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+build:
+  stage: build
+  script:
+    - echo "Build stage complete"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying application..."
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
